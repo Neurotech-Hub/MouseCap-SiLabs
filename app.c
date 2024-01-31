@@ -34,10 +34,28 @@
 #include "gatt_db.h"
 #include "app.h"
 #include "sl_simple_led_instances.h"
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include "blink.h"
+#include "config.h"
+#include <stdio.h>
+
+#define COMMAND_STR_MAX_SIZE 20 // should match nodeTx characteristic size
 
 // The advertising set handle allocated from Bluetooth stack.
 static uint8_t advertising_set_handle = 0xff;
-void handleNodeRxChange(uint8_t *data, size_t len);
+
+static uint8_t activateOnDisconnect = 0;
+static int amplitude = 0;
+static int frequency = 0;
+static int pulseWidth = 0;
+
+void
+handleNodeRxChange (uint8_t *data, size_t len);
+void
+compileCommandString (char *commandStr);
 
 /**************************************************************************//**
  * Application Init.
@@ -45,10 +63,7 @@ void handleNodeRxChange(uint8_t *data, size_t len);
 SL_WEAK void
 app_init (void)
 {
-  /////////////////////////////////////////////////////////////////////////////
-  // Put your additional application init code here!                         //
-  // This is called once during start-up.                                    //
-  /////////////////////////////////////////////////////////////////////////////
+  blink_init ();
 }
 
 /**************************************************************************//**
@@ -57,11 +72,7 @@ app_init (void)
 SL_WEAK void
 app_process_action (void)
 {
-  /////////////////////////////////////////////////////////////////////////////
-  // Put your additional application code here!                              //
-  // This is called infinitely.                                              //
-  // Do not call blocking functions from here!                               //
-  /////////////////////////////////////////////////////////////////////////////
+  blink_process_action ();
 }
 
 /**************************************************************************//**
@@ -107,12 +118,22 @@ sl_bt_on_event (sl_bt_msg_t *evt)
       // This event indicates that a new connection was opened.
     case sl_bt_evt_connection_opened_id:
       app_log_info("Connection opened.\n");
+
+      activateOnDisconnect = 0; // reset
+      stop_blinking ();
+      sl_led_turn_off (LED_INSTANCE); // known state
       break;
 
       // -------------------------------
       // This event indicates that a connection was closed.
     case sl_bt_evt_connection_closed_id:
       app_log_info("Connection closed.\n");
+
+      sl_led_turn_off (LED_INSTANCE); // known state
+      if (activateOnDisconnect)
+        {
+          start_blinking ();
+        }
 
       // Generate data for advertising
       sc = sl_bt_legacy_advertiser_generate_data (
@@ -146,6 +167,13 @@ sl_bt_on_event (sl_bt_msg_t *evt)
             {
               // Trigger your function here and pass the buffer and len as parameters
               handleNodeRxChange (buffer, len);
+
+              // get command string and set nodeTxx
+              char commandStr[COMMAND_STR_MAX_SIZE];
+              compileCommandString (commandStr);
+              // Write attribute in the local GATT database.
+              sc = sl_bt_gatt_server_write_attribute_value (
+                  gattdb_node_tx, 0, sizeof(commandStr), (uint8_t*) commandStr);
             }
           else
             {
@@ -171,17 +199,65 @@ sl_bt_on_event (sl_bt_msg_t *evt)
     }
 }
 
-void handleNodeRxChange(uint8_t *data, size_t len) {
-    // Convert the data to a string
-    char str[len + 1]; // +1 for null terminator
-    memcpy(str, data, len);
-    str[len] = '\0'; // Null-terminate the string
-
-    // Toggle LED based on the received string
-    if (str[0] == '0') {
-        sl_led_toggle(SL_SIMPLE_LED_INSTANCE(0));
-        app_log_info("LED toggled.\n");
-    } else {
-        app_log_error("Invalid attribute value: %s\n", str);
+void
+compileCommandString (char *commandStr)
+{
+  if (commandStr != NULL)
+    {
+      // Initialize the entire buffer with null characters
+      memset (commandStr, 0, COMMAND_STR_MAX_SIZE);
+      // Format the string with the global variable values
+      sprintf(commandStr, "_A%u,F%u,P%u,G%u", amplitude, frequency, pulseWidth, activateOnDisconnect);
     }
 }
+
+void
+handleNodeRxChange (uint8_t *data, size_t len)
+{
+  if (len == 0 || data[0] != '_')
+    {
+      return; // No valid data or does not start with '_'
+    }
+
+  // Convert data to null-terminated string
+  char str[len + 1]; // +1 for null terminator
+  memset (str, 0, len + 1); // Initialize buffer to zero
+  memcpy (str, data, len);
+  str[len] = '\0';
+
+  // Tokenize the string
+  char *token = strtok (str + 1, ","); // Start from str + 1 to skip '_'
+  while (token != NULL)
+    {
+      char settingType = token[0];
+      int value = atoi (token + 1); // Convert string to integer
+
+      switch (settingType)
+        {
+        case 'A':
+          amplitude = value;
+          break;
+        case 'F':
+          frequency = value;
+          break;
+        case 'P':
+          pulseWidth = value;
+          break;
+        case 'L':
+          if (value)
+            {
+              sl_led_toggle (LED_INSTANCE);
+            }
+          break;
+        case 'G':
+          activateOnDisconnect = value;
+          break;
+        default:
+          // Handle unknown setting
+          break;
+        }
+
+      token = strtok (NULL, ","); // Get next token
+    }
+}
+
