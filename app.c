@@ -47,11 +47,11 @@ compileCommandString(char *commandStr);
 SL_WEAK void app_init(void) {
 	blink_init();
 	sl_led_turn_on(LED_INSTANCE);
-	rhs2116_init(sl_spidrv_spi_inst_handle);
-	uint32_t chipId = rhs2116_readRegister(RHS_CHIP_ID);
-	while (chipId != 32) {
-		chipId = rhs2116_readRegister(RHS_CHIP_ID);
-	}
+//	rhs2116_init(sl_spidrv_spi_inst_handle);
+//	uint32_t chipId = rhs2116_readRegister(RHS_CHIP_ID);
+//	while (chipId != 32) {
+//		chipId = rhs2116_readRegister(RHS_CHIP_ID);
+//	}
 	sl_led_turn_off(LED_INSTANCE);
 }
 
