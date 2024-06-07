@@ -20,10 +20,10 @@
 #include "app.h"
 #include "app_assert.h"
 #include "app_log.h"
-#include "blink.h"
+//#include "blink.h"
 #include "config.h"
 #include "gatt_db.h"
-#include "rhs2116.h"
+//#include "rhs2116.h"
 
 // BLE
 #define COMMAND_STR_MAX_SIZE 20 // should match nodeTx characteristic size
@@ -45,7 +45,7 @@ compileCommandString(char *commandStr);
  * Application Init.
  *****************************************************************************/
 SL_WEAK void app_init(void) {
-	blink_init();
+//	blink_init();
 	sl_led_turn_on(LED_INSTANCE);
 //	rhs2116_init(sl_spidrv_spi_inst_handle);
 //	uint32_t chipId = rhs2116_readRegister(RHS_CHIP_ID);
@@ -59,7 +59,7 @@ SL_WEAK void app_init(void) {
  * Application Process Action.
  *****************************************************************************/
 SL_WEAK void app_process_action(void) {
-	blink_process_action();
+//	blink_process_action();
 	// other application processes
 }
 
@@ -105,7 +105,7 @@ void sl_bt_on_event(sl_bt_msg_t *evt) {
 		app_log_info("Connection opened.\n");
 
 		activateOnDisconnect = 0; // reset
-		stop_blinking();
+//		stop_blinking();
 		sl_led_turn_off(LED_INSTANCE); // known state
 		break;
 
@@ -116,7 +116,7 @@ void sl_bt_on_event(sl_bt_msg_t *evt) {
 
 		sl_led_turn_off(LED_INSTANCE); // known state
 		if (activateOnDisconnect) {
-			start_blinking();
+//			start_blinking();
 		}
 
 		// Generate data for advertising
